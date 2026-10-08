@@ -1,0 +1,14 @@
+project_name: writeup_attck_pipeline
+data_root: data
+db_path: data/db/pipeline.sqlite3
+# Absolute or repo-relative path to filtered ATT&CK workbook (never mutated)
+attck_workbook: ../benchmark/templates/ATT&CK技巧.xlsx
+attck_sheet: Sheet1
+# Yellow fill (#FFFF00) on technique cell => excluded from core coverage
+attck_excluded_fill_rgb_suffix: "FFFF00"
+exports_dir: data/exports
+raw_dir: data/raw
+parsed_dir: data/parsed
+default_mode: incremental
+respect_robots: true
+log_level: INFO

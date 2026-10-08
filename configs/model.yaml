@@ -1,0 +1,23 @@
+# LLM configuration (OpenAI-compatible). Secrets via environment only.
+provider: openai_compatible
+# Example: https://api.deepseek.com  or https://api.openai.com/v1
+base_url: ${LLM_BASE_URL:-https://api.deepseek.com}
+api_key_env: LLM_API_KEY
+model: ${LLM_MODEL:-deepseek-chat}
+temperature: 0.1
+# Keep output budget; finish_reason=length + empty content usually means this was too small
+# relative to a large JSON dump of many steps.
+max_tokens: 8192
+timeout_sec: 180
+# Chunking: NEVER send a full writeup in one prompt
+chunking:
+  max_chars_per_chunk: 1800
+  overlap_chars: 150
+  max_chunks_per_writeup: 60
+  max_steps_per_chunk: 6
+prompt_versions:
+  path_extract: v2
+  # Stage-2 evidence verification (Stage-1 candidates are code-side)
+  technique_map: verify_v2
+  chain_extract: v1
+  chain_recover: v1

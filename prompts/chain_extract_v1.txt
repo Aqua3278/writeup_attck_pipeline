@@ -1,0 +1,52 @@
+You extract the SUCCESSFUL attack chain from a writeup SECTION that already
+describes the solve path / full attack chain / success narrative.
+
+============================================================
+GOAL
+============================================================
+Coverage meaning: techniques needed on the path that completed the objective.
+Extract ONLY successful-path behaviors (including necessary recon prerequisites).
+
+EXCLUDE:
+- Hypotheses that were ruled out / failed / abandoned
+- Dead-end probes not used by later success steps
+- Pure KPI / report-card metrics without attack behavior
+
+INCLUDE:
+- Recon that discovered assets later used for success
+- Credential discovery that was later used
+- Exploitation / lateral / priv-esc that led to the objective
+
+============================================================
+RULES
+============================================================
+- action = short Chinese behavioral description; evidence = quotes/commands from text
+- action MUST NOT exceed evidence
+- Do NOT invent steps not supported by the section
+- Mark failed branches as chain_status=excluded with brief reason
+- Successful / necessary steps: chain_status=selected
+- Keep order of the successful path
+- Max max_steps steps
+
+Return JSON only:
+{
+  "objective": "one-line goal if stated",
+  "paths": [
+    {
+      "path_id": "path1",
+      "summary": "one-line path summary",
+      "steps": [
+        {
+          "sequence": 1,
+          "action": "中文行为",
+          "step_type": "reconnaissance|credential_access|exploitation|execution|discovery|lateral_movement|privilege_escalation|collection|other",
+          "phase": "侦察|账户/凭据获取|初始访问|执行|权限提升|持久化|发现|横向移动|收集|其他",
+          "evidence": "quote from section",
+          "chain_status": "selected|excluded",
+          "chain_reason": "why selected or excluded",
+          "confidence": 0.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# Data source registry. Add a new source by appending an entry + choosing/implementing an adapter.
+sources:
+  - source_id: goad_mayfly
+    source_name: GOAD Mayfly Writeups
+    source_type: blog_category
+    entry_url: https://mayfly277.github.io/categories/goad/
+    adapter_type: goad
+    enabled: true
+    crawl_config:
+      max_depth: 2
+      follow_same_host_only: true
+      request_interval_sec: 1.0
+      max_concurrency: 2
+      timeout_sec: 30
+      retries: 3
+      user_agent: "writeup-attck-pipeline/0.1 (research; respectful crawler)"
+
+  - source_id: xbow_redamon
+    source_name: XBOW RedAmon Wiki
+    source_type: github_wiki
+    entry_url: https://github.com/samugit83/redamon/wiki/XBOW-Validation-Benchmark
+    adapter_type: xbow
+    enabled: true
+    crawl_config:
+      max_depth: 2
+      follow_same_host_only: false
+      request_interval_sec: 1.2
+      max_concurrency: 2
+      timeout_sec: 45
+      retries: 3
+      prefer_raw_wiki: true
+      user_agent: "writeup-attck-pipeline/0.1 (research; respectful crawler)"
+      # Optional: set GITHUB_TOKEN in env for API; never put tokens here.
+
+  - source_id: local_samples
+    source_name: Local Sample Writeups
+    source_type: local_files
+    entry_url: null
+    adapter_type: local
+    enabled: true
+    crawl_config:
+      root_dir: data/local_import
+      patterns: ["**/*.md", "**/*.txt", "**/*.html"]
