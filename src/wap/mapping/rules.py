@@ -74,16 +74,46 @@ ACCOUNT_OBTAIN = re.compile(
     r")",
     re.I,
 )
+# Explicit auth success only — not login page/form, Set-Cookie, HTTP 302/200, welcome.
 AUTH_SUCCESS = re.compile(
     r"("
-    r"logged\s*in|log\s*in\s*success|authentication\s*success|"
-    r"302\s*(FOUND|to\s+/)|Location:\s*/(dashboard|home|admin|orders)|"
-    r"welcome|session\s*(issued|created|cookie)|Set-Cookie:|"
-    r"登录成功|成功登录|认证成功|获得.?session|进入.?后台"
+    r"authentication\s+succeed(?:ed)?|"
+    r"authentication\s+successful|"
+    r"successfully\s+authenticated|"
+    r"authenticated\s+successfully|"
+    r"login\s+succeed(?:ed)?|"
+    r"login\s+successful|"
+    r"successfully\s+logged\s*in|"
+    r"logged\s*in\s+successfully|"
+    r"log\s*in\s+success|"
+    r"登录成功|成功登录|认证成功"
     r")",
     re.I,
 )
-
+# Concrete account / credential identity present in the step (not obtain/discovery).
+ACCOUNT_IDENTITY = re.compile(
+    r"("
+    r"[`'\"]?[A-Za-z0-9._-]{1,64}:[A-Za-z0-9._\-!@#$%]{1,64}[`'\"]?|"
+    r"\buser(name)?\s*[:=]\s*[`'\"]?[A-Za-z0-9._@-]{1,64}|"
+    r"\b(logged\s*in|authenticated)\s+as\s+[`'\"]?[A-Za-z0-9._@-]{1,64}|"
+    r"\bas\s+[`'\"]?[A-Za-z0-9._@-]{2,64}\b|"
+    r"以\s*\S+\s*身份|"
+    r"(用户名|账号|账户)\s*[:=]?\s*\S+"
+    r")",
+    re.I,
+)
+AUTH_FAIL = re.compile(
+    r"("
+    r"authentication\s+fail|"
+    r"login\s+fail|"
+    r"failed\s+(to\s+)?(authenticate|log\s*in)|"
+    r"invalid\s+cred|"
+    r"wrong\s+password|"
+    r"incorrect\s+password|"
+    r"登录失败|认证失败|密码错误|凭据无效|口令错误"
+    r")",
+    re.I,
+)
 PROBE_ONLY = re.compile(
     r"("
     r"vulnerable|not vulnerable|check(?:ing)?\s+(for\s+)?vuln|"
@@ -219,20 +249,30 @@ def demote_retained(
                 "须有窃取/重放/伪造/他人会话等 hard evidence。",
             )
 
-    # --- T1078 ---
+    # --- T1078 Valid Accounts ---
+    # Retain: ACCOUNT_IDENTITY + AUTH_SUCCESS + no AUTH_FAIL.
+    # Credential discovery/acquisition need NOT appear on the same step.
     if _prefix(technique_id, "T1078"):
-        if not ACCOUNT_OBTAIN.search(hard):
+        if AUTH_FAIL.search(hard):
             return (
                 MappingStatus.excluded,
                 reason
-                + "；[自动降级] 出现 password/login ≠ T1078；"
-                "须有发现/获取/喷洒等凭据来源 hard evidence。",
+                + "；[自动降级] authentication/login failed 或无效凭据 ≠ 成功认证，"
+                "不能 retained T1078。",
+            )
+        if not ACCOUNT_IDENTITY.search(hard):
+            return (
+                MappingStatus.excluded,
+                reason
+                + "；[自动降级] 无明确账户/用户身份（如 user:pass、username=、as alice），"
+                "不能 retained T1078。",
             )
         if not AUTH_SUCCESS.search(hard):
             return (
                 MappingStatus.excluded,
                 reason
-                + "；[自动降级] 仅发现凭据但无认证成功/有效性 hard evidence，不能 retained T1078。",
+                + "；[自动降级] 无明确认证成功表述（authentication succeeded / 登录成功等）；"
+                "login page/form、Set-Cookie、HTTP 302/200、welcome 单独不足。",
             )
 
     # --- T1190 ---

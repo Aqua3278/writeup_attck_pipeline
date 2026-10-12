@@ -129,6 +129,21 @@ class MappingService:
             }
         steps = selected if selected else all_steps
         mappings: list[TechniqueMapping] = []
+        # Prior *selected* chain steps only — supplement semantics for Stage-1 recall
+        prior_selected: list[dict] = []
+
+        def _remember_prior(st) -> None:
+            cs = (st["chain_status"] if "chain_status" in st.keys() else "pending") or "pending"
+            # Only successful-path steps become context (when mapping selected list, all qualify)
+            if cs == "selected" or (bool(selected) and cs != "excluded"):
+                prior_selected.append(
+                    {
+                        "action": str(st["action"] or ""),
+                        "evidence": str(st["evidence"] or ""),
+                        "sequence": int(st["sequence"] or 0),
+                    }
+                )
+
         for i, step in enumerate(steps, 1):
             step_type = (step["step_type"] if "step_type" in step.keys() else None) or "other"
             if step_type in NON_COVERAGE_STEP_TYPES:
@@ -151,14 +166,16 @@ class MappingService:
                         evidence_directness="direct",
                     )
                 )
+                _remember_prior(step)
                 continue
 
-            # Stage-1: candidates (high recall)
+            # Stage-1: candidates (high recall; prior selected steps as context)
             cands = generate_candidates(
                 action=str(step["action"] or ""),
                 evidence=str(step["evidence"] or ""),
                 catalog_ids=retained_ids,
                 max_candidates=8,
+                prior_selected_steps=prior_selected,
             )
             if not cands:
                 mappings.append(
@@ -174,6 +191,7 @@ class MappingService:
                         behavior_observed=str(step["action"] or ""),
                     )
                 )
+                _remember_prior(step)
                 continue
 
             cand_block = self._catalog_lines(cands, catalog)
@@ -210,6 +228,7 @@ class MappingService:
                         confidence=0.0,
                     )
                 )
+                _remember_prior(step)
                 continue
 
             raw = data.get("verifications") or data.get("mappings") or []
@@ -252,6 +271,8 @@ class MappingService:
             else:
                 self._normalize_roles(step_maps)
                 mappings.extend(step_maps)
+
+            _remember_prior(step)
 
         self.store.replace_mappings(writeup_id, mappings)
         retained_techs = sorted(

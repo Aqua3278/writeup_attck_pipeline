@@ -80,28 +80,97 @@ def test_stolen_session_t1550_ok():
     assert st == MappingStatus.retained
 
 
-def test_plain_login_not_t1078():
+def test_plain_login_status_not_t1078():
+    """Bare logged-in / HTTP redirect alone is not AUTH_SUCCESS."""
     st, _ = demote_retained(
         technique_id="T1078",
         status=MappingStatus.retained,
         reason="成功登录",
-        evidence="POST /login user=demo pass=demo → logged in",
-        supporting="登录成功",
+        evidence="POST /login user=demo pass=demo → logged in 302 FOUND",
+        supporting="返回 302",
         step_type="credential_access",
         action="登录",
     )
     assert st == MappingStatus.excluded
 
 
-def test_discover_without_auth_not_t1078():
+def test_authentication_succeeded_matches_auth_success_gate():
+    from wap.mapping.rules import ACCOUNT_IDENTITY, AUTH_SUCCESS
+
+    assert AUTH_SUCCESS.search("Authentication succeeded with test:test")
+    assert AUTH_SUCCESS.search("successfully authenticated as admin")
+    assert not AUTH_SUCCESS.search("authentication failed with test:test")
+    assert not AUTH_SUCCESS.search("Set-Cookie: session=abc")
+    assert not AUTH_SUCCESS.search("welcome to dashboard HTTP 302")
+    assert ACCOUNT_IDENTITY.search("Authentication succeeded with `test:test`")
+
+
+def test_t1078_auth_succeeded_with_identity_retained():
+    """A: use-step with identity + succeeded — no same-step obtain required."""
+    st, _ = demote_retained(
+        technique_id="T1078",
+        status=MappingStatus.retained,
+        reason="使用有效账户认证成功",
+        evidence="Authentication succeeded with `test:test`",
+        supporting="test:test 认证成功",
+        step_type="credential_access",
+        action="使用 test:test 完成认证",
+    )
+    assert st == MappingStatus.retained
+
+
+def test_t1078_discover_only_not_retained():
+    """B: credential discovery alone ≠ Valid Accounts use."""
     st, _ = demote_retained(
         technique_id="T1078",
         status=MappingStatus.retained,
         reason="发现凭据",
-        evidence="found in HTML comment test:test",
-        supporting="注释中发现 test:test",
+        evidence="HTML comment leaks `test:test` credentials",
+        supporting="注释中泄露 test:test",
         step_type="credential_access",
         action="发现凭据",
+    )
+    assert st == MappingStatus.excluded
+
+
+def test_t1078_login_form_not_retained():
+    """C: login page/form discovery."""
+    st, _ = demote_retained(
+        technique_id="T1078",
+        status=MappingStatus.retained,
+        reason="发现登录页",
+        evidence="login form discovered on `/`",
+        supporting="发现登录表单",
+        step_type="reconnaissance",
+        action="发现登录页",
+    )
+    assert st == MappingStatus.excluded
+
+
+def test_t1078_login_failed_not_retained():
+    """D: failed auth / invalid credentials."""
+    st, _ = demote_retained(
+        technique_id="T1078",
+        status=MappingStatus.retained,
+        reason="登录失败",
+        evidence="authentication failed with `test:test`; invalid credentials",
+        supporting="凭据无效",
+        step_type="credential_access",
+        action="尝试登录",
+    )
+    assert st == MappingStatus.excluded
+
+
+def test_t1078_success_without_identity_not_retained():
+    """E: Authentication succeeded but no account identity."""
+    st, _ = demote_retained(
+        technique_id="T1078",
+        status=MappingStatus.retained,
+        reason="认证成功",
+        evidence="Authentication succeeded",
+        supporting="认证成功",
+        step_type="credential_access",
+        action="完成认证",
     )
     assert st == MappingStatus.excluded
 
@@ -111,8 +180,11 @@ def test_comment_creds_login_t1078_ok():
         technique_id="T1078",
         status=MappingStatus.retained,
         reason="使用注释凭据登录成功",
-        evidence="found in HTML comment test:test then login → logged in 302 FOUND Location: /dashboard",
-        supporting="注释中发现 test:test 并登录成功",
+        evidence=(
+            "found in HTML comment test:test then authentication succeeded "
+            "with test:test"
+        ),
+        supporting="注释中发现 test:test 并认证成功",
         step_type="credential_access",
         action="用发现的凭据登录",
     )
