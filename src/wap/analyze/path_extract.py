@@ -142,7 +142,6 @@ class PathExtractService:
                         evidence_location=f"{chunk_id}:{s.get('evidence_location', '')}",
                         evidence_type=et_enum,
                         inference=bool(s.get("inference") or et_enum == EvidenceType.inferred),
-                        confidence=float(s.get("confidence") or 0.0),
                         chunk_id=chunk_id,
                         step_type=step_type,
                         phase=phase,

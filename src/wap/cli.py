@@ -171,28 +171,6 @@ def map_cmd(source_id: str | None, writeup_id: str | None, offline: bool) -> Non
         rprint(svc.map_all(source_id))
 
 
-@main.command("refilter")
-@click.option("--source", "source_id", default=None)
-@click.option("--writeup-id", default=None)
-def refilter_cmd(source_id: str | None, writeup_id: str | None) -> None:
-    """Re-apply evidence demotion rules without calling the LLM."""
-    from wap.db.store import Store
-    from wap.mapping.refilter import RefilterService
-    from wap.utils.config import load_yaml
-
-    store = Store(load_yaml("configs/pipeline.yaml")["db_path"])
-    svc = RefilterService()
-    if writeup_id:
-        writeup_id = store.resolve_writeup_id(writeup_id)
-        rprint(svc.refilter_writeup(writeup_id))
-        return
-    out = []
-    for w in store.list_writeups(source_id):
-        if store.get_mappings(w["writeup_id"]):
-            out.append(svc.refilter_writeup(w["writeup_id"]))
-    rprint(out)
-
-
 @main.command()
 @click.option("--source", "source_id", default=None)
 @click.option("--writeup-id", default=None)

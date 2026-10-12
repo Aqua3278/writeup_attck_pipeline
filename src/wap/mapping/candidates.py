@@ -3,11 +3,17 @@ from __future__ import annotations
 """Stage-1 candidate generation: high recall, never decides retained.
 
 Behavior-signal layers + optional prior *selected* attack-chain context.
-Precision gates live in rules.py / verify.py — not here.
+Semantic retained/excluded is decided by ensemble multi-model voting.
 """
 
 import re
 from typing import Any, Iterable, Mapping, Optional, Sequence
+
+from wap.mapping.evidence_signals import (
+    AUTH_SUCCESS_RE,
+    CMD_INTERPRETER_RE,
+    infer_execution_context,
+)
 
 # ---------------------------------------------------------------------------
 # Shared primitives
@@ -57,23 +63,8 @@ _CRED_OBTAIN = re.compile(
 )
 _SPRAY = re.compile(r"\b(spray|bruteforc|喷洒|爆破|credential\s*sweep)\b", re.I)
 
-# Auth success (candidate recall; gate may be stricter)
-_AUTH_OK = re.compile(
-    r"("
-    r"authentication\s+succeed(?:ed)?|"
-    r"authentication\s+successful|"
-    r"successfully\s+authenticated|"
-    r"authenticated\s+successfully|"
-    r"\bauthenticated\b|"
-    r"login\s+succeed(?:ed)?|"
-    r"login\s+successful|"
-    r"successfully\s+logged\s*in|"
-    r"logged\s*in\s+successfully|"
-    r"log\s*in\s+success|"
-    r"登录成功|成功登录|认证成功"
-    r")",
-    re.I,
-)
+# Auth success phrases used only for Stage-1 T1078 recall
+_AUTH_OK = AUTH_SUCCESS_RE
 _AUTH_FAIL_OR_SURFACE = re.compile(
     r"("
     r"authentication\s+fail|"
@@ -100,28 +91,21 @@ _ACCOUNT_ID = re.compile(
     re.I,
 )
 
+# Broad exploit / web-abuse recall (high recall; models decide retain).
 _EXPLOIT = re.compile(
     r"("
-    r"(?:^|[^A-Za-z])(exploit|ssti|rce|webshell|proxyshell|idor|payload)(?:[^A-Za-z]|$)|"
+    r"(?:^|[^A-Za-z])(exploit|ssti|rce|webshell|proxyshell|idor|payload|xss)(?:[^A-Za-z]|$)|"
+    r"cross[- ]?site|broken\s+access|unauthorized\s+access|"
+    r"\balert\s*\(|\bonfocus\b|\bonerror\b|"
     r"\{\{[^{}]{0,200}\}\}|"
     r"__globals__|__builtins__|"
-    r"jinja2|模板注入|利用|注入"
+    r"jinja2|模板注入|利用|注入|越权|跨站"
     r")",
     re.I,
 )
 
 # Command / script execution *signals* (not sufficient for retained)
-_CMD_EXEC = re.compile(
-    r"("
-    r"\b(bash|sh|zsh|pwsh|powershell|cmd\.exe)\b|"
-    r"python\s+-c\b|"
-    r"\bos\.system\b|\bos\.popen\b|\bsubprocess\b|"
-    r"\bexec\s*\(|\bsystem\s*\(|"
-    r"command\s+execution|execute\s+command|"
-    r"命令执行|执行命令"
-    r")",
-    re.I,
-)
+_CMD_EXEC = CMD_INTERPRETER_RE
 
 # File / data access signals
 _FILE_ACCESS = re.compile(
@@ -150,72 +134,17 @@ _C2 = re.compile(r"\b(c2|beacon|callback|exfil)\b", re.I)
 _TOOL_GET = re.compile(r"\b(git\s+clone|pip\s+install)\b", re.I)
 _ACCOUNT_DISC = re.compile(r"\b(userenum|账户发现)\b", re.I)
 
-# Execution context helpers (candidate recall only)
-_CTX_ATTACKER_LOCAL = re.compile(
-    r"("
-    r"while\s+read\b|"
-    r"\bkali_shell\b|"
-    r"for\s+\w+\s+in\s+\$\(|"
-    r"\bbash\b.{0,120}\b(curl|wget|httpie)\b|"
-    r"\b(curl|wget)\b.{0,80}\b(for|while|loop)\b|"
-    r"本地脚本|本机自动化|attacker[-_ ]?(host|side|local)|"
-    r"automation\s+(script|loop)"
-    r")",
-    re.I,
-)
-_CTX_WEB_SERVER = re.compile(
-    r"("
-    r"\b(ssti|jinja2?|twig|freemarker)\b|"
-    r"\{\{[^{}]{0,200}\}\}|"
-    r"__globals__|__builtins__|"
-    r"\bos\.popen\b|\bos\.system\b|"
-    r"模板注入|服务端|web\s*server|in[- ]?app\s+exec"
-    r")",
-    re.I,
-)
-_CTX_TARGET_HOST = re.compile(
-    r"("
-    r"\b(psexec|wmiexec|evil-winrm)\b|"
-    r"ssh\s+\S+@|"
-    r"on\s+the\s+(target|victim|remote)\s+host|"
-    r"目标主机|受害主机|远程主机上"
-    r")",
-    re.I,
-)
 
-# Back-compat names used by older audits / imports
-_SCAN_STRONG = _SCAN
-_CRED_ABUSE = _CRED_OBTAIN
-_AUTH_SUCCESS_USE = _AUTH_OK
-_ACCOUNT_REF = _ACCOUNT_ID
-_EXPLOITISH = _EXPLOIT
-_EXEC = _CMD_EXEC
-_COLLECT = _FILE_ACCESS
-
-
-def infer_execution_context(blob: str) -> str:
-    """
-    Lightweight context for candidate recall only.
-    Returns: attacker_local | web_server | target_host | unknown
-    """
-    if not (blob or "").strip():
-        return "unknown"
-    # Prefer target/web when both local tooling and in-app exec appear
-    if _CTX_WEB_SERVER.search(blob):
-        return "web_server"
-    if _CTX_TARGET_HOST.search(blob):
-        return "target_host"
-    if _CTX_ATTACKER_LOCAL.search(blob):
-        return "attacker_local"
-    return "unknown"
-
-
-def _blob(action: str, evidence: str) -> str:
-    return f"{action or ''}\n{evidence or ''}"
+def _blob(action: str, evidence: str, purpose: str = "") -> str:
+    return f"{action or ''}\n{evidence or ''}\n{purpose or ''}"
 
 
 def _step_blob(step: Mapping[str, Any]) -> str:
-    return _blob(str(step.get("action") or ""), str(step.get("evidence") or ""))
+    return _blob(
+        str(step.get("action") or ""),
+        str(step.get("evidence") or ""),
+        str(step.get("purpose") or ""),
+    )
 
 
 def _prior_has_account(prior: Sequence[Mapping[str, Any]]) -> bool:
@@ -268,7 +197,7 @@ def _sig_auth_cred_use(
     catalog: set[str],
     lim: int,
 ) -> None:
-    """Valid-account use / credential obtain — high recall; gate decides retain."""
+    """Valid-account use / credential obtain — high recall; models decide retain."""
     if _AUTH_FAIL_OR_SURFACE.search(blob) and not _AUTH_OK.search(blob):
         # login form / fail alone
         pass
@@ -354,15 +283,17 @@ def generate_candidates(
     catalog_ids: Iterable[str],
     max_candidates: int = 8,
     prior_selected_steps: Optional[Sequence[Mapping[str, Any]]] = None,
+    purpose: str = "",
 ) -> list[str]:
     """
     Return technique-id hypotheses present in catalog.
 
     prior_selected_steps: earlier *successful-path* steps only (chain_status=selected).
     Used to reconnect credential obtain → use → auth across steps. Never raw traces.
+    purpose: optional step purpose (improves recall; still not a retain decision).
     """
     catalog = set(catalog_ids)
-    blob = _blob(action, evidence)
+    blob = _blob(action, evidence, purpose)
     prior = list(prior_selected_steps or [])
     out: list[str] = []
     seen: set[str] = set()

@@ -385,7 +385,6 @@ class ChainService:
                     evidence_location=f"chain:{pid}:seq{seq}",
                     evidence_type=et,
                     inference=False,
-                    confidence=float(st.get("confidence") or 0.7),
                     chunk_id="chain_extract",
                     step_type=str(st.get("step_type") or "other"),
                     phase=str(st.get("phase") or "其他"),
@@ -442,7 +441,6 @@ class ChainService:
                     "chain_reason": "offline: failed-branch keyword"
                     if failed
                     else "offline: narrative line",
-                    "confidence": 0.4,
                 }
             )
             if seq >= max_steps:
@@ -465,7 +463,6 @@ class ChainService:
                     if failed
                     else "offline: keep pending causal filter",
                     "depends_on_sequences": [],
-                    "confidence": 0.35,
                 }
             )
         return {

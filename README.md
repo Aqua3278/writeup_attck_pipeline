@@ -15,8 +15,8 @@
 2. **分阶段解耦**：crawl → analyze → map → validate → report，可单独运行。
 3. **LLM 不分整篇硬塞**：按段落/chunk 提取步骤，再逐步映射。
 4. **证据分级**：`direct` / `inferred` / `mentioned` / `unknown`；`mentioned` 不进入攻击步骤。
-5. **证据驱动映射（核心）**：Evidence → 行为 → ATT&CK 定义 → 必要条件 → retained。准确率优先于覆盖率。
-6. **两阶段映射**：Stage-1 候选（高召回，代码侧）→ Stage-2 验证（高精确，LLM + 代码门控）。禁止工具名/关键词/`step_type`/结果倒推直接 retained。
+5. **证据驱动映射（核心）**：Evidence → 行为 → ATT&CK 定义 → retained。准确率优先于覆盖率。
+6. **候选筛选 + 多模型投票**：Stage-1 候选（高召回，代码侧）→ 模型 A/B 独立判断 → 分歧或证据不足时模型 C 裁决；代码只做结构校验（候选集、黄标、每步 retained 上限）。禁止工具名/关键词/`step_type`/结果倒推直接 retained。
 7. **行为级 Step**：合并连续同类 HTTP 探测；action 不得超过 evidence；区分 observation / attack / setup。
 8. **step_type**：分类字段；`tool_setup` / `data_processing` / `validation` / `observation` 默认不计入覆盖。
 9. **人读报告**：Step↔ATT&CK 绑定；短理由；中文名来自固定 metadata。
@@ -65,8 +65,10 @@ python main.py crawl --source xbow_redamon --limit 3
 # 加载 ATT&CK 表
 python main.py load-attck
 
-# 路径拆解 / 映射 / 校验（需 LLM）
+# 路径拆解 / 映射 / 校验（需 LLM；map 使用 A/B/C 投票）
+# 可选环境变量：MAP_MODEL_A / MAP_MODEL_B / MAP_MODEL_C（默认回退 LLM_MODEL）
 python main.py analyze --writeup-id <id>
+python main.py chain --writeup-id <id>
 python main.py map --writeup-id <id>
 python main.py validate --writeup-id <id>
 
@@ -118,14 +120,18 @@ python main.py report
 
 ```bash
 pytest tests -q
+# 映射标准夹具回归（confirmed 断言 / TBD 跳过统计）
+pytest tests/test_mapping_cases.py -s -q
 ```
+
+首批适用性标准见 `docs/mapping_applicability.md`；样本库见 `tests/fixtures/mapping_cases.yaml`。
 
 ## 目录结构
 
 ```
 writeup_attck_pipeline/
   configs/           # sources.yaml, model.yaml, pipeline.yaml
-  prompts/           # path_extract_v2, technique_verify_v2
+  prompts/           # path_extract_v2, technique_ensemble_v1, chain_*
   src/wap/
     sources/adapters/  # goad, xbow, web, github, local
     crawl/ analyze/ mapping/ validate/ report/

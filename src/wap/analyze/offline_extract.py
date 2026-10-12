@@ -52,7 +52,6 @@ class OfflinePathExtractService:
                         evidence_location=f"offline_regex:{m.start()}",
                         evidence_type=EvidenceType.direct,
                         inference=False,
-                        confidence=0.4,
                         chunk_id="offline",
                         step_type="reconnaissance",
                         phase="侦察",

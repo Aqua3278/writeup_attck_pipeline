@@ -95,6 +95,8 @@ class Store:
             ("evidence_directness", "TEXT DEFAULT 'direct'"),
             ("mapping_evidence", "TEXT DEFAULT ''"),
             ("counterevidence", "TEXT DEFAULT ''"),
+            ("candidates_json", "TEXT DEFAULT '[]'"),
+            ("ensemble_json", "TEXT DEFAULT ''"),
         ):
             if col not in map_cols:
                 c.execute(f"ALTER TABLE technique_mappings ADD COLUMN {col} {decl}")
@@ -241,9 +243,9 @@ class Store:
                     """INSERT INTO attack_steps(
                         step_id, writeup_id, sequence, action, target, input, output,
                         purpose, prerequisite, evidence, evidence_location, evidence_type,
-                        inference, confidence, chunk_id, created_at, step_type, phase,
+                        inference, chunk_id, created_at, step_type, phase,
                         chain_status, chain_reason, path_id, depends_on_json
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         s.step_id,
                         s.writeup_id,
@@ -258,7 +260,6 @@ class Store:
                         s.evidence_location,
                         s.evidence_type.value,
                         1 if s.inference else 0,
-                        s.confidence,
                         s.chunk_id,
                         utcnow(),
                         s.step_type or "other",
@@ -283,11 +284,12 @@ class Store:
                     """INSERT INTO technique_mappings(
                         mapping_id, step_id, writeup_id, technique_id, technique_name,
                         tactic, mapping_status, mapping_type, mapping_reason, evidence,
-                        evidence_location, confidence, review_status, created_at,
+                        evidence_location, review_status, created_at,
                         mapping_role, supporting_behavior,
                         behavior_observed, definition_match, required_conditions_met,
-                        evidence_directness, mapping_evidence, counterevidence
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        evidence_directness, mapping_evidence, counterevidence,
+                        candidates_json, ensemble_json
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         m.mapping_id,
                         m.step_id,
@@ -300,7 +302,6 @@ class Store:
                         m.mapping_reason,
                         m.evidence,
                         m.evidence_location,
-                        m.confidence,
                         m.review_status,
                         utcnow(),
                         m.mapping_role or "sole",
@@ -311,6 +312,8 @@ class Store:
                         m.evidence_directness or "direct",
                         m.mapping_evidence or "",
                         m.counterevidence or "",
+                        m.candidates_json or "[]",
+                        m.ensemble_json or "",
                     ),
                 )
 

@@ -74,7 +74,6 @@ class OfflineMappingService:
                         mapping_reason="offline keyword heuristic (replace with LLM map)",
                         evidence=step["evidence"] or "",
                         evidence_location=step["evidence_location"] or "",
-                        confidence=0.35,
                         review_status="open",
                     )
                 )
@@ -89,7 +88,6 @@ class OfflineMappingService:
                         mapping_reason="no heuristic match",
                         evidence=step["evidence"] or "",
                         evidence_location=step["evidence_location"] or "",
-                        confidence=0.0,
                     )
                 )
         self.store.replace_mappings(writeup_id, mappings)

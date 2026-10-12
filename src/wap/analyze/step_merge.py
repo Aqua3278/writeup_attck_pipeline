@@ -116,7 +116,6 @@ def merge_behavioral_steps(steps: list[AttackStep], max_evidence_chars: int = 12
         else:
             action = actions[0]
 
-        conf = min(x.confidence for x in g) if g else 0.0
         merged.append(
             AttackStep(
                 step_id=head.step_id,
@@ -132,7 +131,6 @@ def merge_behavioral_steps(steps: list[AttackStep], max_evidence_chars: int = 12
                 evidence_location=head.evidence_location,
                 evidence_type=head.evidence_type,
                 inference=any(x.inference for x in g),
-                confidence=conf,
                 chunk_id=head.chunk_id,
                 step_type=step_type,
                 phase=head.phase or "侦察",

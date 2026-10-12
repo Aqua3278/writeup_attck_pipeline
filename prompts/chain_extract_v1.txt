@@ -43,8 +43,7 @@ Return JSON only:
           "phase": "侦察|账户/凭据获取|初始访问|执行|权限提升|持久化|发现|横向移动|收集|其他",
           "evidence": "quote from section",
           "chain_status": "selected|excluded",
-          "chain_reason": "why selected or excluded",
-          "confidence": 0.0
+          "chain_reason": "why selected or excluded"
         }
       ]
     }

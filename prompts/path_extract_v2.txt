@@ -69,8 +69,7 @@ Return JSON only:
       "prerequisite": "...",
       "evidence": "verbatim quotes/commands; multiple lines OK if same intent",
       "evidence_type": "direct",
-      "inference": false,
-      "confidence": 0.0
+      "inference": false
     }
   ],
   "edges": [

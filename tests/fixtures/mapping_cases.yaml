@@ -1,0 +1,220 @@
+# Mapping regression cases (candidate recall only).
+# Do NOT backfill expected_* from live DB / model output.
+# standard_status: confirmed → asserted; TBD → skipped (counted only).
+# Semantic retained/excluded is tested in tests/test_ensemble.py (mocked votes).
+
+version: 1
+catalog_ids:
+  - T1595
+  - T1046
+  - T1190
+  - T1078
+  - T1550
+  - T1550.004
+  - T1110
+  - T1059
+  - T1005
+
+cases:
+  - id: T1078-C1-auth-success-candidate-recall
+    technique_id: T1078
+    layers: [candidate]
+    action: 使用 test:test 完成认证
+    evidence: "Authentication succeeded with `test:test`"
+    supporting: test:test 认证成功
+    step_type: credential_access
+    expected_candidate_contains: [T1078]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1078"]
+    source: tests/test_candidates.py::test_auth_succeeded_with_account_yields_t1078
+
+  - id: T1078-P2-comment-creds-then-success
+    technique_id: T1078
+    layers: [candidate]
+    action: 用发现的凭据登录
+    evidence: "found in HTML comment test:test then authentication succeeded with test:test"
+    supporting: 注释中发现 test:test 并认证成功
+    step_type: credential_access
+    expected_candidate_contains: [T1078]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1078"]
+
+  - id: T1078-N1-discover-only
+    technique_id: T1078
+    layers: [candidate]
+    action: 发现凭据
+    evidence: "HTML comment leaks `test:test` credentials"
+    supporting: 注释中泄露 test:test
+    step_type: credential_access
+    expected_candidate_contains: [T1078]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1078"]
+    notes: Stage-1 可召回；是否 retained 由模型投票决定。
+
+  - id: T1078-N2-login-failed
+    technique_id: T1078
+    layers: [candidate]
+    action: 尝试登录
+    evidence: "authentication failed with `test:test`; invalid credentials"
+    supporting: 凭据无效
+    step_type: credential_access
+    expected_candidate_excludes: [T1078]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1078"]
+
+  - id: T1078-Neg1-not-authenticated
+    technique_id: T1078
+    layers: [candidate]
+    action: 尝试使用 user:user 认证
+    evidence: "not authenticated with user:user"
+    supporting: 认证未成功
+    step_type: credential_access
+    expected_candidate_contains: null
+    standard_status: TBD
+    standard_refs: [TBD-T1078-2]
+    source: synthetic
+    notes: 否定极性待确认（召回与投票均不在此断言）。
+
+  - id: T1078-N3-login-form-only
+    technique_id: T1078
+    layers: [candidate]
+    action: 发现登录页
+    evidence: "login form discovered on `/`"
+    supporting: 发现登录表单
+    step_type: reconnaissance
+    expected_candidate_excludes: [T1078]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1078"]
+
+  - id: T1059-P1-os-popen-web-server
+    technique_id: T1059
+    layers: [candidate]
+    action: 借 os.popen 调用 shell 执行 cat/env/grep 等命令
+    evidence: >-
+      GET /remind?date={{ cycler.__init__.__globals__.os.popen(
+      "cat /app/app.py; env; grep -R FLAG{ /app").read() }}
+    supporting: 证据中明确出现经解释器执行的 shell 命令串（cat/env/grep）
+    step_type: execution
+    expected_candidate_contains: [T1059]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1059"]
+
+  - id: T1059-N1-attacker-local-bash-curl
+    technique_id: T1059
+    layers: [candidate]
+    action: kali_shell 循环 curl 订单接口
+    evidence: >-
+      while read oid; do curl -b "$COOKIE"
+      http://t/order/$oid/receipt; done < wordlist.txt
+    supporting: kali_shell 自动化请求
+    step_type: exploitation
+    expected_candidate_excludes: [T1059]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1059"]
+
+  - id: T1190-P1-exploit-with-shell-effect
+    technique_id: T1190
+    layers: [candidate]
+    action: 利用漏洞
+    evidence: got a shell after ProxyShell exploit
+    supporting: 成功利用获得 shell
+    step_type: exploitation
+    expected_candidate_contains: [T1190]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1190"]
+
+  - id: T1190-N1-payload-only
+    technique_id: T1190
+    layers: [candidate]
+    action: 注入模板
+    evidence: "POST name={{7*7}}"
+    supporting: 发送 SSTI payload
+    step_type: exploitation
+    expected_candidate_contains: [T1190]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1190"]
+    notes: Stage-1 可因模板信号召回。
+
+  - id: T1190-TBD-idor-success-xben001
+    technique_id: T1190
+    layers: [candidate]
+    action: 对订单收据接口做 IDOR 批量读取并检出 FLAG
+    evidence: >-
+      while read oid; do curl -b "$COOKIE"
+      http://lab/order/$oid/receipt; done < order_ids.txt | grep FLAG{
+      Flag returned at order 300401 (IDOR, other user's receipt).
+    supporting: IDOR 读取他户订单收据得到 FLAG
+    step_type: exploitation
+    expected_candidate_contains: null
+    standard_status: TBD
+    standard_refs: [TBD-T1190-2]
+    source: data/parsed/xbow_redamon/xbow__xben-001-24__session.md
+    notes: 成功 IDOR 步骤的召回期望待确认。
+
+  - id: T1190-TBD-xss-success-payload
+    technique_id: T1190
+    layers: [candidate]
+    action: 提交 XSS payload
+    evidence: 'POST solution=<input autofocus onfocus=alert("XSS")>'
+    supporting: 提交 XSS
+    step_type: exploitation
+    expected_candidate_contains: null
+    standard_status: TBD
+    standard_refs: [TBD-T1190-1]
+    notes: XSS 成功/效果标准未决。
+
+  - id: T1595-P1-ffuf-wordlist
+    technique_id: T1595
+    layers: [candidate]
+    action: 目录枚举
+    evidence: ffuf -w SecLists/Discovery/Web-Content/common.txt -u http://t/FUZZ
+    supporting: 使用 ffuf 配合字典批量枚举路径
+    step_type: reconnaissance
+    expected_candidate_contains: [T1595]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1595"]
+
+  - id: T1595-N1-single-curl
+    technique_id: T1595
+    layers: [candidate]
+    action: 对目标 Web 根路径发起 HTTP 请求
+    evidence: "execute_curl args: -s -i http://lab-30cc2125/"
+    supporting: GET /
+    step_type: reconnaissance
+    expected_candidate_excludes: [T1595]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1595"]
+
+  - id: T1550-P1-stolen-session
+    technique_id: T1550
+    layers: [candidate]
+    action: 会话重放
+    evidence: replay stolen session cookie of another user
+    supporting: 重放他人 session
+    step_type: credential_access
+    expected_candidate_contains: [T1550]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1550"]
+
+  - id: T1550-N1-own-cookie
+    technique_id: T1550
+    layers: [candidate]
+    action: 访问 dashboard
+    evidence: "Cookie: session=abc123 GET /dashboard"
+    supporting: 使用登录后的 session 访问
+    step_type: collection
+    expected_candidate_excludes: [T1550, T1550.004]
+    standard_status: confirmed
+    standard_refs: ["docs/mapping_applicability.md#t1550"]
+
+  - id: T1046-TBD-ffuf-co-recall
+    technique_id: T1046
+    layers: [candidate]
+    action: 目录枚举
+    evidence: ffuf -w wordlist -u http://t/FUZZ
+    supporting: ffuf 枚举
+    step_type: reconnaissance
+    expected_candidate_contains: null
+    standard_status: TBD
+    standard_refs: [TBD-T1046-1]
+    notes: 与 T1595 同信号是否应召回 T1046 待确认。

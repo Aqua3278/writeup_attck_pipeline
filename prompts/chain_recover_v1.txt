@@ -46,8 +46,7 @@ Return JSON only:
           "source_sequence": 3,
           "chain_status": "selected|excluded|unknown",
           "chain_reason": "一句话",
-          "depends_on_sequences": [1, 2],
-          "confidence": 0.0
+          "depends_on_sequences": [1, 2]
         }
       ]
     }

@@ -71,7 +71,6 @@ CREATE TABLE IF NOT EXISTS attack_steps (
   evidence_location TEXT,
   evidence_type TEXT,
   inference INTEGER,
-  confidence REAL,
   chunk_id TEXT,
   created_at TEXT,
   step_type TEXT DEFAULT 'other',
@@ -113,11 +112,18 @@ CREATE TABLE IF NOT EXISTS technique_mappings (
   mapping_reason TEXT,
   evidence TEXT,
   evidence_location TEXT,
-  confidence REAL,
   review_status TEXT,
   created_at TEXT,
   mapping_role TEXT DEFAULT 'sole',
-  supporting_behavior TEXT DEFAULT ''
+  supporting_behavior TEXT DEFAULT '',
+  behavior_observed TEXT DEFAULT '',
+  definition_match INTEGER DEFAULT 0,
+  required_conditions_met INTEGER DEFAULT 0,
+  evidence_directness TEXT DEFAULT 'direct',
+  mapping_evidence TEXT DEFAULT '',
+  counterevidence TEXT DEFAULT '',
+  candidates_json TEXT DEFAULT '[]',
+  ensemble_json TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS validation_issues (

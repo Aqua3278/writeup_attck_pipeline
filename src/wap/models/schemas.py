@@ -100,7 +100,6 @@ class AttackStep(BaseModel):
     evidence_location: str
     evidence_type: EvidenceType
     inference: bool = False
-    confidence: float = 0.0
     chunk_id: Optional[str] = None
     step_type: str = "other"
     phase: str = "其他"
@@ -142,17 +141,19 @@ class TechniqueMapping(BaseModel):
     mapping_reason: str
     evidence: str
     evidence_location: str
-    confidence: float
     review_status: str = "open"
     mapping_role: str = "sole"
     supporting_behavior: str = ""
-    # Stage-2 verification fields (auditability)
+    # Audit / legacy Stage-2 fields (still populated for report compatibility)
     behavior_observed: str = ""
     definition_match: bool = False
     required_conditions_met: bool = False
     evidence_directness: str = "direct"  # direct|indirect|inferred
     mapping_evidence: str = ""
     counterevidence: str = ""
+    # Ensemble vote audit (JSON strings; empty on pre-ensemble rows)
+    candidates_json: str = "[]"
+    ensemble_json: str = ""
 
 
 class ValidationIssue(BaseModel):
