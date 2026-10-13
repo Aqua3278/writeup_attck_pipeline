@@ -210,9 +210,10 @@ def build_step_user_prompt(
     step_total: int,
 ) -> str:
     return (
-        "Judge EACH candidate for THIS step only. "
-        "stances: support | reject | insufficient.\n"
-        "Do NOT invent ids outside CANDIDATES.\n\n"
+        "只对本步骤的每个候选做判断。"
+        "stance 只能是 support | reject | insufficient。"
+        "reason 必须是一句简体中文（证据是英文也要中文写理由）。"
+        "禁止编造 CANDIDATES 之外的 id。\n\n"
         f"CANDIDATES:\n{candidate_block}\n\n"
         f"STEP ({step_index}/{step_total}):\n"
         f"action={step.get('action') or ''}\n"

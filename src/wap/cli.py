@@ -191,6 +191,80 @@ def validate(source_id: str | None, writeup_id: str | None) -> None:
         rprint(f"[{i.severity}] {i.code}: {i.message}")
 
 
+@main.command("eval-candidates")
+@click.option("--max-candidates", type=int, default=10)
+@click.option(
+    "--top-k",
+    "top_ks",
+    multiple=True,
+    type=int,
+    default=(10, 20, 30),
+    show_default=True,
+    help="Top-K grid for vector recall evaluation.",
+)
+@click.option(
+    "--out",
+    "out_path",
+    default="data/exports/candidate_eval/compare_vector.json",
+    show_default=True,
+)
+@click.option("--with-full-catalog", is_flag=True, help="Index full retained workbook")
+def eval_candidates_cmd(
+    max_candidates: int,
+    top_ks: tuple[int, ...],
+    out_path: str,
+    with_full_catalog: bool,
+) -> None:
+    """Evaluate Stage-1 vector candidates on confirmed mapping_cases gold."""
+    from pathlib import Path
+
+    from wap.mapping.candidate.evaluate import compare_strategies, write_report
+    from wap.mapping.candidate.types import config_from_pipeline
+    from wap.utils.config import load_yaml, resolve_path
+
+    pipeline_cfg = load_yaml("configs/pipeline.yaml")
+    base_config = config_from_pipeline(pipeline_cfg)
+    catalog_refs = None
+    if with_full_catalog:
+        from wap.mapping.attck_catalog import load_attck_workbook
+        from wap.mapping.attck_meta import enrich_ref
+        from wap.mapping.candidate.catalog_docs import merge_technique_refs
+
+        techs = load_attck_workbook(
+            resolve_path(pipeline_cfg["attck_workbook"]),
+            sheet=pipeline_cfg.get("attck_sheet", "Sheet1"),
+            excluded_rgb_suffix=pipeline_cfg.get(
+                "attck_excluded_fill_rgb_suffix", "FFFF00"
+            ),
+        )
+        for t in techs:
+            enrich_ref(t)
+        catalog_refs = merge_technique_refs(techs)
+
+    payload = compare_strategies(
+        max_candidates=max_candidates,
+        top_k_grid=list(top_ks) or [10, 20, 30],
+        catalog_refs=catalog_refs,
+        base_config=base_config,
+    )
+    path = write_report(payload, Path(out_path))
+    rprint(f"wrote {path}")
+    for rep in payload["reports"]:
+        rprint(
+            f"[cyan]{rep['strategy']}[/cyan] {rep['select_label']} "
+            f"recall={rep['recall']} avg_cands={rep['avg_candidates']} "
+            f"exclude_prec={rep['exclude_precision']}"
+        )
+    for cid, rows in (payload.get("focus_cases") or {}).items():
+        rprint(f"[yellow]focus {cid}[/yellow]")
+        for row in rows:
+            rprint(
+                f"  {row['strategy']} {row['select_label']} "
+                f"rank={row.get('gold_rank')} score={row.get('gold_score')} "
+                f"ok={row.get('contains_ok')}"
+            )
+
+
 @main.command()
 @click.option("--writeup-id", default=None)
 @click.option("--format", "fmt", type=click.Choice(["markdown", "all"]), default="all")

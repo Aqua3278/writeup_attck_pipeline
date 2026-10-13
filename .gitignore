@@ -7,5 +7,6 @@ data/raw/
 data/parsed/
 data/db/
 data/exports/
+data/cache/
 *.sqlite3
 .pytest_cache/

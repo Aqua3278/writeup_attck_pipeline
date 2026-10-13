@@ -1,10 +1,8 @@
 project_name: writeup_attck_pipeline
 data_root: data
 db_path: data/db/pipeline.sqlite3
-# Absolute or repo-relative path to filtered ATT&CK workbook (never mutated)
 attck_workbook: ../benchmark/templates/ATT&CK技巧.xlsx
 attck_sheet: Sheet1
-# Yellow fill (#FFFF00) on technique cell => excluded from core coverage
 attck_excluded_fill_rgb_suffix: "FFFF00"
 exports_dir: data/exports
 raw_dir: data/raw
@@ -12,3 +10,16 @@ parsed_dir: data/parsed
 default_mode: incremental
 respect_robots: true
 log_level: INFO
+
+# Stage-1: pure dense vector retrieval over retained ATT&CK techniques.
+candidate_generation:
+  strategy: vector
+  max_candidates: 10
+  embedding:
+    model_name_or_path: BAAI/bge-m3
+    device: cpu
+    batch_size: 16
+    cache_dir: data/cache/embeddings
+    query_prefix: null
+    doc_prefix: null
+    normalize: true

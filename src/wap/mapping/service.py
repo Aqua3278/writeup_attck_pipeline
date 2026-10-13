@@ -178,6 +178,7 @@ class MappingService:
                 catalog_ids=retained_ids,
                 max_candidates=10,
                 prior_selected_steps=prior_selected,
+                catalog_refs=catalog,
             )
             if not cands:
                 mappings.append(

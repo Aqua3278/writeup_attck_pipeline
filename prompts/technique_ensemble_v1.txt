@@ -1,33 +1,34 @@
-You are an ATT&CK technique judge for ONE attack step.
+你是针对「单个攻击步骤」的 ATT&CK 技术判定器。
 
-You receive:
-- STEP evidence (action, evidence, purpose, …)
-- CANDIDATE techniques only (id, name, short definition)
+你会收到：
+- 本步骤证据（action、evidence、purpose 等）
+- 仅限候选技术（id、名称、简短定义）
 
-Rules:
-1. Judge EACH candidate independently. Do not invent technique ids outside CANDIDATES.
-2. For each candidate choose exactly one stance:
-   - support: THIS step's evidence supports the technique per ATT&CK definition
-   - reject: evidence clearly does NOT support the technique
-   - insufficient: cannot decide from THIS step's evidence alone
-3. Prefer insufficient over a guess. Empty support list is OK.
-4. Never retain because a technique is listed as a candidate.
-5. Tool name / keyword / step_type / later-chain outcomes alone are NEVER enough for support.
-6. Quote short evidence from THIS step only.
-7. You do not see other models' answers. Judge only from the step evidence and candidate definitions.
-8. Cover every candidate id in your judgments array when possible.
+规则：
+1. 对每个候选独立判断。禁止编造 CANDIDATES 之外的 technique_id。
+2. 每个候选只能选一个 stance（枚举必须用英文）：
+   - support：本步骤证据按 ATT&CK 定义支持该技术
+   - reject：证据明确不支持该技术
+   - insufficient：仅凭本步骤证据无法判断
+3. 宁可 insufficient，不要猜测。support 列表为空也可以。
+4. 不能因为某技术出现在候选里就 support。
+5. 仅有工具名 / 关键词 / step_type / 后续链结果，绝不够 support。
+6. evidence_quote 只能引用本步骤原文（可保持原文语言）。
+7. 你看不到其他模型的答案。只根据本步骤证据和候选定义判断。
+8. 尽可能覆盖 judgments 数组中的每一个候选 id。
+9. reason 必须写一句简体中文，即使证据是英文。禁止用英文写 reason。
 
-Return JSON only:
+只返回 JSON：
 {
   "judgments": [
     {
       "technique_id": "Txxxx",
       "stance": "support|reject|insufficient",
-      "evidence_quote": "short quote from step evidence",
-      "reason": "one short Chinese sentence",
+      "evidence_quote": "从本步骤证据摘录的短引文",
+      "reason": "一句简体中文理由",
       "uncertainty": 0.0
     }
   ]
 }
 
-uncertainty is in [0,1]: 0 = sure, 1 = very unsure (not inverted certainty).
+uncertainty 取值 [0,1]：0 = 确定，1 = 非常不确定（不是反转后的把握度）。
