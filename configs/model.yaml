@@ -1,6 +1,6 @@
 # LLM configuration (OpenAI-compatible). Secrets via environment only.
 provider: openai_compatible
-# Default provider (analyze / chain / fallback)
+# Default provider (analyze / chain / map)
 base_url: ${LLM_BASE_URL:-https://api.deepseek.com}
 api_key_env: LLM_API_KEY
 model: ${LLM_MODEL:-deepseek-chat}
@@ -8,41 +8,21 @@ temperature: 0.1
 max_tokens: 8192
 timeout_sec: 180
 
-# Multi-model ATT&CK mapping: each role may use a different provider.
-# Empty model/base_url/api_key_env → fall back to top-level defaults above.
-ensemble:
-  enabled: true
-  strategy_version: vote_v1
-  prompt_version: ensemble_v1
-  max_retained_per_step: 2
-  model_a:
-    model: ${MAP_MODEL_A:-}
-    base_url: ${MAP_BASE_URL_A:-}
-    api_key_env: ${MAP_API_KEY_ENV_A:-}
-    temperature: 0.1
-    max_tokens: 4096
-  model_b:
-    model: ${MAP_MODEL_B:-}
-    base_url: ${MAP_BASE_URL_B:-}
-    api_key_env: ${MAP_API_KEY_ENV_B:-}
-    temperature: 0.1
-    max_tokens: 4096
-  model_c:
-    model: ${MAP_MODEL_C:-}
-    base_url: ${MAP_BASE_URL_C:-}
-    api_key_env: ${MAP_API_KEY_ENV_C:-}
-    # kimi-k2.6 + thinking.disabled → temperature must be 0.6 (thinking.on → 1)
-    temperature: 0.6
-    max_tokens: 4096
-    disable_thinking: true
-
 chunking:
   max_chars_per_chunk: 1800
   overlap_chars: 150
   max_chunks_per_writeup: 60
   max_steps_per_chunk: 6
+
+# Direct LLM mapping: full retained catalog, single model, no vector / A/B/C.
+# Catalog is partitioned into batches so every technique is checked.
+direct_llm:
+  enabled: true
+  prompt_version: direct_llm_v1
+  batch_size: 40
+
 prompt_versions:
   path_extract: v2
-  technique_map: ensemble_v1
+  technique_direct_llm: direct_llm_v1
   chain_extract: v1
   chain_recover: v1

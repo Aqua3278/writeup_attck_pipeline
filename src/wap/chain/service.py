@@ -8,7 +8,6 @@ No benchmark-specific if/else — content-driven via resolve_chain_source.
 """
 
 import json
-import re
 import uuid
 from typing import Any, Optional
 
@@ -18,25 +17,17 @@ from wap.models.schemas import AttackStep, EvidenceType, PathEdge
 from wap.utils.config import ROOT, load_yaml, resolve_path
 from wap.utils.llm import LLMClient
 
-_FAILED = re.compile(
-    r"(?i)\b(ruled\s+out|failed|unsuccessful|dead\s*end|abandoned|"
-    r"no\s+longer\s+pursued|排除|失败|走不通|放弃)\b"
-)
-
 
 class ChainService:
     def __init__(
         self,
         pipeline_cfg: Optional[dict] = None,
         model_cfg: Optional[dict] = None,
-        *,
-        offline: bool = False,
     ):
         self.cfg = pipeline_cfg or load_yaml("configs/pipeline.yaml")
         self.model_cfg = model_cfg or load_yaml("configs/model.yaml")
         self.store = Store(self.cfg["db_path"])
-        self.offline = offline
-        self.llm = None if offline else LLMClient(self.model_cfg)
+        self.llm = LLMClient(self.model_cfg)
         vers = self.model_cfg.get("prompt_versions") or {}
         ex = ROOT / "prompts" / f"chain_extract_{vers.get('chain_extract', 'v1')}.txt"
         rc = ROOT / "prompts" / f"chain_recover_{vers.get('chain_recover', 'v1')}.txt"
@@ -139,28 +130,25 @@ class ChainService:
         raw_count = len(existing)
         max_steps = 24
 
-        if self.offline or self.llm is None:
-            paths_data = self._offline_extract(section_text, max_steps)
-        else:
-            try:
-                data = self.llm.chat_json(
-                    self.extract_system,
-                    (
-                        f"writeup_id={writeup_id}\nmax_steps={max_steps}\n"
-                        f"source={source}\n\nSECTION:\n{section_text[:12000]}"
-                    ),
-                )
-            except Exception as e:
-                self._mark_unresolved(writeup_id, f"chain extract LLM failed: {e}")
-                return {
-                    "writeup_id": writeup_id,
-                    "attack_chain_source": "unresolved",
-                    "coverage_status": "insufficient_evidence",
-                    "raw_step_count": raw_count,
-                    "attack_chain_step_count": 0,
-                    "error": str(e),
-                }
-            paths_data = data
+        try:
+            data = self.llm.chat_json(
+                self.extract_system,
+                (
+                    f"writeup_id={writeup_id}\nmax_steps={max_steps}\n"
+                    f"source={source}\n\nSECTION:\n{section_text[:12000]}"
+                ),
+            )
+        except Exception as e:
+            self._mark_unresolved(writeup_id, f"chain extract LLM failed: {e}")
+            return {
+                "writeup_id": writeup_id,
+                "attack_chain_source": "unresolved",
+                "coverage_status": "insufficient_evidence",
+                "raw_step_count": raw_count,
+                "attack_chain_step_count": 0,
+                "error": str(e),
+            }
+        paths_data = data
 
         steps, edges, path_meta = self._paths_to_steps(
             writeup_id, paths_data, existing_for_enrich=existing
@@ -216,35 +204,32 @@ class ChainService:
                 "notes": notes,
             }
 
-        if self.offline or self.llm is None:
-            data = self._offline_recover(existing)
-        else:
-            cand_lines = []
-            for s in existing:
-                cand_lines.append(
-                    f"seq={s['sequence']}\taction={s['action']}\t"
-                    f"type={s['step_type'] if 'step_type' in s.keys() else ''}\t"
-                    f"evidence={(s['evidence'] or '')[:240]}"
-                )
-            try:
-                data = self.llm.chat_json(
-                    self.recover_system,
-                    (
-                        f"writeup_id={writeup_id}\n"
-                        f"OBJECTIVE/TRACE CONTEXT (truncated):\n{corpus[:6000]}\n\n"
-                        f"CANDIDATE_STEPS:\n" + "\n".join(cand_lines)
-                    ),
-                )
-            except Exception as e:
-                self._mark_unresolved(writeup_id, f"chain recover LLM failed: {e}")
-                return {
-                    "writeup_id": writeup_id,
-                    "attack_chain_source": "unresolved",
-                    "coverage_status": "insufficient_evidence",
-                    "raw_step_count": raw_count,
-                    "attack_chain_step_count": 0,
-                    "error": str(e),
-                }
+        cand_lines = []
+        for s in existing:
+            cand_lines.append(
+                f"seq={s['sequence']}\taction={s['action']}\t"
+                f"type={s['step_type'] if 'step_type' in s.keys() else ''}\t"
+                f"evidence={(s['evidence'] or '')[:240]}"
+            )
+        try:
+            data = self.llm.chat_json(
+                self.recover_system,
+                (
+                    f"writeup_id={writeup_id}\n"
+                    f"OBJECTIVE/TRACE CONTEXT (truncated):\n{corpus[:6000]}\n\n"
+                    f"CANDIDATE_STEPS:\n" + "\n".join(cand_lines)
+                ),
+            )
+        except Exception as e:
+            self._mark_unresolved(writeup_id, f"chain recover LLM failed: {e}")
+            return {
+                "writeup_id": writeup_id,
+                "attack_chain_source": "unresolved",
+                "coverage_status": "insufficient_evidence",
+                "raw_step_count": raw_count,
+                "attack_chain_step_count": 0,
+                "error": str(e),
+            }
 
         if data.get("unresolved") is True or not (data.get("paths") or []):
             self._mark_unresolved(
@@ -415,60 +400,3 @@ class ChainService:
             if key and key in blob and (s["evidence"] or ""):
                 return str(s["evidence"])[:500]
         return evidence
-
-    def _offline_extract(self, section_text: str, max_steps: int) -> dict:
-        """Heuristic extract when LLM unavailable (smoke / CI)."""
-        lines = [
-            ln.strip(" -*\t")
-            for ln in section_text.splitlines()
-            if ln.strip() and not ln.strip().startswith("#")
-        ]
-        steps = []
-        seq = 0
-        for ln in lines:
-            if len(ln) < 12:
-                continue
-            seq += 1
-            failed = bool(_FAILED.search(ln))
-            steps.append(
-                {
-                    "sequence": seq,
-                    "action": ln[:120],
-                    "step_type": "other",
-                    "phase": "其他",
-                    "evidence": ln[:400],
-                    "chain_status": "excluded" if failed else "selected",
-                    "chain_reason": "offline: failed-branch keyword"
-                    if failed
-                    else "offline: narrative line",
-                }
-            )
-            if seq >= max_steps:
-                break
-        return {
-            "objective": "",
-            "paths": [{"path_id": "path1", "summary": "offline extract", "steps": steps}],
-        }
-
-    def _offline_recover(self, existing: list) -> dict:
-        steps_out = []
-        for s in existing:
-            blob = f"{s['action'] or ''}\n{s['evidence'] or ''}"
-            failed = bool(_FAILED.search(blob))
-            steps_out.append(
-                {
-                    "source_sequence": int(s["sequence"]),
-                    "chain_status": "excluded" if failed else "selected",
-                    "chain_reason": "offline: failed keyword"
-                    if failed
-                    else "offline: keep pending causal filter",
-                    "depends_on_sequences": [],
-                }
-            )
-        return {
-            "unresolved": False,
-            "objective": "",
-            "paths": [
-                {"path_id": "path1", "summary": "offline recover", "steps": steps_out}
-            ],
-        }

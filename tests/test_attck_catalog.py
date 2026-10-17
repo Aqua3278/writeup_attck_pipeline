@@ -3,7 +3,7 @@ from pathlib import Path
 from wap.mapping.attck_catalog import catalog_summary, load_attck_workbook
 
 ROOT = Path(__file__).resolve().parents[1]
-XLSX = ROOT.parent / "benchmark" / "templates" / "ATT&CK技巧.xlsx"
+XLSX = ROOT / "attck" / "ATT&CK技巧.xlsx"
 
 
 def test_load_attck_workbook():

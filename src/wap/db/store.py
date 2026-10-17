@@ -97,6 +97,7 @@ class Store:
             ("counterevidence", "TEXT DEFAULT ''"),
             ("candidates_json", "TEXT DEFAULT '[]'"),
             ("ensemble_json", "TEXT DEFAULT ''"),
+            ("mapping_method", "TEXT DEFAULT 'direct_llm'"),
         ):
             if col not in map_cols:
                 c.execute(f"ALTER TABLE technique_mappings ADD COLUMN {col} {decl}")
@@ -276,10 +277,34 @@ class Store:
                     (writeup_id, e.from_step_id, e.to_step_id, e.relation),
                 )
 
-    def replace_mappings(self, writeup_id: str, mappings: list[TechniqueMapping]) -> None:
+    def replace_mappings(
+        self,
+        writeup_id: str,
+        mappings: list[TechniqueMapping],
+        *,
+        method: Optional[str] = None,
+    ) -> None:
+        """Replace mappings for a writeup.
+
+        If ``method`` is set, only rows with that ``mapping_method`` are deleted
+        and replaced.
+        If ``method`` is None, all mapping rows for the writeup are cleared
+        (used when the attack chain becomes unresolved).
+        """
         with self.conn() as c:
-            c.execute("DELETE FROM technique_mappings WHERE writeup_id=?", (writeup_id,))
+            if method is None:
+                c.execute(
+                    "DELETE FROM technique_mappings WHERE writeup_id=?", (writeup_id,)
+                )
+            else:
+                c.execute(
+                    "DELETE FROM technique_mappings WHERE writeup_id=? AND mapping_method=?",
+                    (writeup_id, method),
+                )
             for m in mappings:
+                m_method = (
+                    (m.mapping_method or method or "direct_llm").strip() or "direct_llm"
+                )
                 c.execute(
                     """INSERT INTO technique_mappings(
                         mapping_id, step_id, writeup_id, technique_id, technique_name,
@@ -288,8 +313,8 @@ class Store:
                         mapping_role, supporting_behavior,
                         behavior_observed, definition_match, required_conditions_met,
                         evidence_directness, mapping_evidence, counterevidence,
-                        candidates_json, ensemble_json
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        candidates_json, ensemble_json, mapping_method
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         m.mapping_id,
                         m.step_id,
@@ -314,6 +339,7 @@ class Store:
                         m.counterevidence or "",
                         m.candidates_json or "[]",
                         m.ensemble_json or "",
+                        m_method,
                     ),
                 )
 
@@ -448,16 +474,25 @@ class Store:
                 )
             )
 
-    def get_mappings(self, writeup_id: Optional[str] = None) -> list[sqlite3.Row]:
+    def get_mappings(
+        self,
+        writeup_id: Optional[str] = None,
+        *,
+        method: Optional[str] = None,
+    ) -> list[sqlite3.Row]:
         with self.conn() as c:
+            clauses: list[str] = []
+            params: list[Any] = []
             if writeup_id:
-                return list(
-                    c.execute(
-                        "SELECT * FROM technique_mappings WHERE writeup_id=?",
-                        (writeup_id,),
-                    )
-                )
-            return list(c.execute("SELECT * FROM technique_mappings"))
+                clauses.append("writeup_id=?")
+                params.append(writeup_id)
+            if method:
+                clauses.append("mapping_method=?")
+                params.append(method)
+            where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+            return list(
+                c.execute(f"SELECT * FROM technique_mappings{where}", params)
+            )
 
     def save_issues(self, issues: list[ValidationIssue]) -> None:
         with self.conn() as c:

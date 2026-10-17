@@ -59,43 +59,9 @@ class LLMClient:
             if timeout_sec is not None
             else self.cfg.get("timeout_sec", 120)
         )
-        self.role = role  # optional label: model_a / model_b / model_c
+        self.role = role
         # Extra request body fields (e.g. Moonshot thinking disable)
         self.extra_body: dict[str, Any] = {}
-
-    @classmethod
-    def for_ensemble_role(cls, model_cfg: Optional[dict], role: str) -> "LLMClient":
-        """Build a client for ensemble role (model_a|model_b|model_c).
-
-        Each role may override model / base_url / api_key_env (different providers).
-        Falls back to top-level model/base_url/api_key_env when role fields are empty.
-        """
-        cfg = model_cfg or load_yaml("configs/model.yaml")
-        ens = cfg.get("ensemble") or {}
-        role_cfg = ens.get(role) or {}
-        model = role_cfg.get("model") or cfg.get("model", "deepseek-chat")
-        if isinstance(model, str) and (not model.strip() or "${" in model):
-            model = cfg.get("model", "deepseek-chat")
-        base_url = (role_cfg.get("base_url") or "").strip() or None
-        if base_url and "${" in base_url:
-            base_url = None
-        api_key_env = (role_cfg.get("api_key_env") or "").strip() or None
-        if api_key_env and "${" in api_key_env:
-            api_key_env = None
-        client = cls(
-            cfg,
-            model=str(model),
-            temperature=role_cfg.get("temperature"),
-            max_tokens=role_cfg.get("max_tokens"),
-            timeout_sec=role_cfg.get("timeout_sec"),
-            role=role,
-            base_url=base_url,
-            api_key_env=api_key_env,
-        )
-        # kimi-k2.6 defaults to thinking; empty content breaks JSON parse — disable for map.
-        if role_cfg.get("disable_thinking") or str(model).lower().startswith("kimi-k2"):
-            client.extra_body["thinking"] = {"type": "disabled"}
-        return client
 
     @property
     def available(self) -> bool:

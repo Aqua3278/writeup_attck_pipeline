@@ -1,0 +1,55 @@
+排除规则：
+1.需要真实用户主动参与
+如果攻击成立必须依赖目标用户点击、输入、批准、回复或其他主动操作，则排除。
+T1598 Phishing for Information
+T1566 Phishing
+T1204 User Execution
+T1698 Social Engineering
+T1111 Multi-Factor Authentication Interception
+T1621 Multi-Factor Authentication Request Generation
+T1534 Internal Spearphishing
+T1189 Drive-by Compromise
+T1203 Exploitation for Client Execution
+T1080 Taint Shared Content
+T1221 Template Injection
+T1665 Generate Content(为上面攻击生产素材)
+2.需要物理介入或物理介质操作
+如果完成技术必须依赖智能体无法自主控制的物理操作，例如插入硬件、移动存储介质、接触设备等，则排除。
+T1200 Hardware Additions
+T1091 Replication Through Removable Media
+T1025 Data from Removable Media
+T1092 Communication Through Removable Media
+T1052 Exfiltration Over Physical Medium
+T1669 Wi-Fi Networks
+3.纯粹面向攻击资源获取与攻击基础设施筹备的技术排除
+若技术的主要行为是为后续攻击获取、注册、购买或控制外部账号、域名、服务器、基础设施或第三方服务，而不直接作用于目标环境，则排除。但如果技术体现的是智能体在攻击过程中开发、生成、修改、上传、下载或部署攻击代码、漏洞利用程序、恶意软件及其他攻击工具的能力，则予以保留。
+T1650 — Acquire Access
+T1583 — Acquire Infrastructure
+T1585 — Establish Accounts
+T1586 — Compromise Accounts
+T1584 — Compromise Infrastructure
+4.主要依赖第三方组织、供应链或外部主体的攻击
+T1195 Supply Chain Compromise
+T1199 Trusted Relationship
+5.以破坏、瘫痪或实际业务损害为主要目标
+T1531	Account Access Removal
+T1485	Data Destruction
+T1486	Data Encrypted for Impact
+T1565	Data Manipulation
+T1491	Defacement
+T1561	Disk Wipe
+T1667	Email Bombing
+T1499	Endpoint Denial of Service
+T1657	Financial Theft
+T1495	Firmware Corruption
+T1490	Inhibit System Recovery
+T1498	Network Denial of Service
+T1496	Resource Hijacking
+T1489	Service Stop
+T1529	System Shutdown/Reboot
+6.依赖特殊硬件/固件/物理环境条件，标准网络沙箱无法复现
+如果攻击技术的执行必须依赖特殊硬件外设、射频物理环境、固件底层编程接口；标准纯软件沙箱/虚拟机靶场缺少对应的硬件、射频、固件改写接口，即使智能体拿到最高系统权限，也无法完整复现该 ATT&CK 行为，则予以排除。
+T1011 Exfiltration Over Other Network Medium
+T1542 Pre-OS Boot
+T1123 Audio Capture
+T1125 Video Capture

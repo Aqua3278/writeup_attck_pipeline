@@ -1,7 +1,7 @@
 # ATT&CK 映射适用性标准（首批）
 
 > **文档性质**：区分「MITRE 官方定义」与「本项目 coverage 策略」。  
-> **不是**把当前 `candidates.py` / `rules.py` 行为当作正确标准。  
+> **不是**把当前 `rules.py` 行为当作正确标准。  
 > 标为 **`TBD`** 的条目须人工确认后，方可写入回归样本的正式 `expected`。  
 > **覆盖统计约定**（项目全局）：仅 `retained` 计入 coverage；黄标技术可记录但不可计入（见 README）。
 
@@ -9,10 +9,8 @@
 
 | 层 | 职责 |
 |----|------|
-| Stage-1 `generate_candidates` | 高召回假设，不决定 retained |
-| `ensemble.EnsembleMapper` | 模型 A/B 独立判断；分歧/不足时模型 C；汇总投票 |
-| 代码结构校验 | 候选集约束、黄标不可计入 coverage、每步 retained 上限 |
-| 回归夹具 `tests/fixtures/mapping_cases.yaml` | 候选召回对照；语义状态见 `tests/test_ensemble.py` |
+| `direct_llm.DirectLlmMapper` | 对照全部 retained 技巧定义，单模型开放式识别 supported / uncertain |
+| 代码结构校验 | 白名单 technique_id、黄标不可计入 coverage |
 
 ---
 

@@ -123,7 +123,8 @@ CREATE TABLE IF NOT EXISTS technique_mappings (
   mapping_evidence TEXT DEFAULT '',
   counterevidence TEXT DEFAULT '',
   candidates_json TEXT DEFAULT '[]',
-  ensemble_json TEXT DEFAULT ''
+  ensemble_json TEXT DEFAULT '',
+  mapping_method TEXT DEFAULT 'direct_llm'
 );
 
 CREATE TABLE IF NOT EXISTS validation_issues (

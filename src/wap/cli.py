@@ -94,26 +94,13 @@ def load_attck() -> None:
 @main.command()
 @click.option("--source", "source_id", default=None)
 @click.option("--writeup-id", default=None)
-@click.option("--offline", is_flag=True, help="regex heuristic when LLM unavailable")
-def analyze(source_id: str | None, writeup_id: str | None, offline: bool) -> None:
+def analyze(source_id: str | None, writeup_id: str | None) -> None:
     from wap.db.store import Store
     from wap.utils.config import load_yaml
 
     store = Store(load_yaml("configs/pipeline.yaml")["db_path"])
     if writeup_id:
         writeup_id = store.resolve_writeup_id(writeup_id)
-    if offline:
-        from wap.analyze.offline_extract import OfflinePathExtractService
-
-        svc = OfflinePathExtractService()
-        if writeup_id:
-            rprint(svc.analyze_writeup(writeup_id))
-        else:
-            out = []
-            for w in store.list_writeups(source_id):
-                out.append(svc.analyze_writeup(w["writeup_id"]))
-            rprint(out)
-        return
     svc = PathExtractService()
     if writeup_id:
         rprint(svc.analyze_writeup(writeup_id))
@@ -124,8 +111,7 @@ def analyze(source_id: str | None, writeup_id: str | None, offline: bool) -> Non
 @main.command("chain")
 @click.option("--source", "source_id", default=None)
 @click.option("--writeup-id", default=None)
-@click.option("--offline", is_flag=True, help="heuristic chain resolve without LLM")
-def chain_cmd(source_id: str | None, writeup_id: str | None, offline: bool) -> None:
+def chain_cmd(source_id: str | None, writeup_id: str | None) -> None:
     """Resolve successful attack chain (before ATT&CK map)."""
     from wap.db.store import Store
     from wap.utils.config import load_yaml
@@ -133,7 +119,7 @@ def chain_cmd(source_id: str | None, writeup_id: str | None, offline: bool) -> N
     store = Store(load_yaml("configs/pipeline.yaml")["db_path"])
     if writeup_id:
         writeup_id = store.resolve_writeup_id(writeup_id)
-    svc = ChainService(offline=offline)
+    svc = ChainService()
     if writeup_id:
         rprint(svc.resolve_writeup(writeup_id))
     else:
@@ -143,26 +129,14 @@ def chain_cmd(source_id: str | None, writeup_id: str | None, offline: bool) -> N
 @main.command("map")
 @click.option("--source", "source_id", default=None)
 @click.option("--writeup-id", default=None)
-@click.option("--offline", is_flag=True, help="keyword heuristic when LLM unavailable")
-def map_cmd(source_id: str | None, writeup_id: str | None, offline: bool) -> None:
+def map_cmd(source_id: str | None, writeup_id: str | None) -> None:
+    """Map attack-chain steps to ATT&CK via direct_llm (full catalog, single model)."""
     from wap.db.store import Store
     from wap.utils.config import load_yaml
 
     store = Store(load_yaml("configs/pipeline.yaml")["db_path"])
     if writeup_id:
         writeup_id = store.resolve_writeup_id(writeup_id)
-    if offline:
-        from wap.mapping.offline_map import OfflineMappingService
-        from wap.mapping.service import MappingService as MS
-
-        MS().load_catalog()
-        svc = OfflineMappingService()
-        if writeup_id:
-            rprint(svc.map_writeup(writeup_id))
-        else:
-            out = [svc.map_writeup(w["writeup_id"]) for w in store.list_writeups(source_id)]
-            rprint(out)
-        return
     svc = MappingService()
     svc.load_catalog()
     if writeup_id:
@@ -191,84 +165,9 @@ def validate(source_id: str | None, writeup_id: str | None) -> None:
         rprint(f"[{i.severity}] {i.code}: {i.message}")
 
 
-@main.command("eval-candidates")
-@click.option("--max-candidates", type=int, default=10)
-@click.option(
-    "--top-k",
-    "top_ks",
-    multiple=True,
-    type=int,
-    default=(10, 20, 30),
-    show_default=True,
-    help="Top-K grid for vector recall evaluation.",
-)
-@click.option(
-    "--out",
-    "out_path",
-    default="data/exports/candidate_eval/compare_vector.json",
-    show_default=True,
-)
-@click.option("--with-full-catalog", is_flag=True, help="Index full retained workbook")
-def eval_candidates_cmd(
-    max_candidates: int,
-    top_ks: tuple[int, ...],
-    out_path: str,
-    with_full_catalog: bool,
-) -> None:
-    """Evaluate Stage-1 vector candidates on confirmed mapping_cases gold."""
-    from pathlib import Path
-
-    from wap.mapping.candidate.evaluate import compare_strategies, write_report
-    from wap.mapping.candidate.types import config_from_pipeline
-    from wap.utils.config import load_yaml, resolve_path
-
-    pipeline_cfg = load_yaml("configs/pipeline.yaml")
-    base_config = config_from_pipeline(pipeline_cfg)
-    catalog_refs = None
-    if with_full_catalog:
-        from wap.mapping.attck_catalog import load_attck_workbook
-        from wap.mapping.attck_meta import enrich_ref
-        from wap.mapping.candidate.catalog_docs import merge_technique_refs
-
-        techs = load_attck_workbook(
-            resolve_path(pipeline_cfg["attck_workbook"]),
-            sheet=pipeline_cfg.get("attck_sheet", "Sheet1"),
-            excluded_rgb_suffix=pipeline_cfg.get(
-                "attck_excluded_fill_rgb_suffix", "FFFF00"
-            ),
-        )
-        for t in techs:
-            enrich_ref(t)
-        catalog_refs = merge_technique_refs(techs)
-
-    payload = compare_strategies(
-        max_candidates=max_candidates,
-        top_k_grid=list(top_ks) or [10, 20, 30],
-        catalog_refs=catalog_refs,
-        base_config=base_config,
-    )
-    path = write_report(payload, Path(out_path))
-    rprint(f"wrote {path}")
-    for rep in payload["reports"]:
-        rprint(
-            f"[cyan]{rep['strategy']}[/cyan] {rep['select_label']} "
-            f"recall={rep['recall']} avg_cands={rep['avg_candidates']} "
-            f"exclude_prec={rep['exclude_precision']}"
-        )
-    for cid, rows in (payload.get("focus_cases") or {}).items():
-        rprint(f"[yellow]focus {cid}[/yellow]")
-        for row in rows:
-            rprint(
-                f"  {row['strategy']} {row['select_label']} "
-                f"rank={row.get('gold_rank')} score={row.get('gold_score')} "
-                f"ok={row.get('contains_ok')}"
-            )
-
-
 @main.command()
 @click.option("--writeup-id", default=None)
-@click.option("--format", "fmt", type=click.Choice(["markdown", "all"]), default="all")
-def report(writeup_id: str | None, fmt: str) -> None:
+def report(writeup_id: str | None) -> None:
     from wap.db.store import Store
     from wap.utils.config import load_yaml
 

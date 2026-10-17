@@ -151,9 +151,10 @@ class TechniqueMapping(BaseModel):
     evidence_directness: str = "direct"  # direct|indirect|inferred
     mapping_evidence: str = ""
     counterevidence: str = ""
-    # Ensemble vote audit (JSON strings; empty on pre-ensemble rows)
+    # Audit JSON (legacy column names retained for DB compat)
     candidates_json: str = "[]"
     ensemble_json: str = ""
+    mapping_method: str = "direct_llm"
 
 
 class ValidationIssue(BaseModel):
